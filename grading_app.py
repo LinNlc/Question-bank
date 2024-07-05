@@ -1,14 +1,17 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox
-import openpyxl
-import logging
-from xlrd import open_workbook
+import tkinter as tk  # 将tkinter模块导入并赋值给简写tk
 from xlutils.copy import copy
 from tkinter import ttk
 import random
 import traceback
 import re
 import requests
+from tkinter import messagebox
+import os
+from tkinter import messagebox, ttk
+from tkinter import filedialog
+import logging
+import openpyxl  # openpyxl库用于操作xlsx格式的Excel文件
+import xlrd  # xlrd库用于操作xls格式的Excel文件
 
 # 设置日志记录
 logging.basicConfig(level=logging.INFO, filename='grading_log.txt', filemode='w',
@@ -20,7 +23,6 @@ class GradingApp:
         self.root = tk.Tk()
         self.root.title("专项题库自动改卷")
         self.root.geometry('1000x600')  # 设置窗口大小
-
         self.filepath = None
 
         # 左侧布局（文件选择、题目数量、每题分值、开始改卷按钮、进度条及百分比、导出日志按钮）
@@ -72,6 +74,16 @@ class GradingApp:
         self.update_log_button = tk.Button(left_frame, text="更新日志", command=self.view_update_log)
         self.update_log_button.pack(pady=5)
 
+        # 增加更新进度条
+        self.update_progress_frame = tk.Frame(left_frame)
+        self.update_progress_frame.pack(pady=20, fill=tk.X)
+
+        self.update_progress_bar = ttk.Progressbar(self.update_progress_frame, orient="horizontal", length=200, mode='determinate')
+        self.update_progress_bar.pack(pady=5)
+
+        self.update_progress_percent = tk.Label(self.update_progress_frame, text="更新进度: 0%")
+        self.update_progress_percent.pack(pady=5)
+
         # 右侧布局（执行日志）
         right_frame = tk.Frame(self.root)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=20, pady=20)
@@ -90,34 +102,69 @@ class GradingApp:
 
     def check_update(self):
         try:
-            response = requests.get("https://example.com/latest_version.txt")
+            response = requests.get("https://raw.githubusercontent.com/LinNlc/Question-bank/main/latest_version.txt")
+            response.raise_for_status()
             latest_version = response.text.strip()
 
             if latest_version > "1.0":
                 if messagebox.askyesno("更新提醒", f"发现新版本 {latest_version}，是否更新？"):
-                    self.update_program()
+                    self.update_program(latest_version)
             else:
                 messagebox.showinfo("更新状态", "当前已是最新版本")
         except Exception as e:
             messagebox.showerror("更新错误", f"无法检查更新: {str(e)}")
 
-    def update_program(self):
+    def update_program(self, latest_version):
         try:
-            response = requests.get("https://example.com/download_latest_program", stream=True)
-            with open("grading_app_latest.exe", "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            messagebox.showinfo("更新成功", "程序已更新，请重新启动")
+            # Remove non-semantic characters from version and ensure it's in semantic version format
+            version_no = re.sub(r'[^0-9.]', '', latest_version)
+            url = f"https://github.com/LinNlc/Question-bank/releases/download/v{version_no}/grading_app_latest.exe"
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            total_size = int(response.headers.get('content-length', 0))
+
+            downloaded = 0
+            chunk_size = 8192
+            retries = 3  # 最大重试次数
+            
+            for attempt in range(retries):
+                try:
+                    with open("grading_app_latest.exe", "wb") as f:
+                        for chunk in response.iter_content(chunk_size=chunk_size):
+                            if chunk:  # filter out keep-alive new chunks
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                progress = downloaded / total_size * 100
+                                self.update_progress_bar['value'] = progress
+                                self.update_progress_percent.config(text=f"更新进度: {int(progress)}%")
+                                self.root.update_idletasks()
+
+                    # Ensure the stream is closed before validation
+                    response.close()
+
+                    # Verify the download completion and file size
+                    local_file_size = os.path.getsize("grading_app_latest.exe")
+                    if local_file_size == total_size:
+                        messagebox.showinfo("更新成功", "程序已更新，请重新启动")
+                        break  # 退出重试循环
+                    else:
+                        raise Exception("下载文件大小不匹配")
+
+                except Exception as e:
+                    if attempt == retries - 1:
+                        raise e  # 重试三次后再引发异常
+                    else:
+                        self.append_log(f"下载中出现错误，重试 {attempt + 1}/{retries}...\n")
+
         except Exception as e:
             messagebox.showerror("更新错误", f"无法更新程序: {str(e)}")
 
-    def run(self):
-        self.check_update()
-        self.root.mainloop()
+
 
     def view_update_log(self):
         try:
-            response = requests.get("https://example.com/update_log.txt")
+            response = requests.get("https://raw.githubusercontent.com/LinNlc/Question-bank/main/update_log.txt")
+            response.raise_for_status()
             update_log = response.text
             messagebox.showinfo("更新日志", update_log)
         except Exception as e:
@@ -203,7 +250,7 @@ class GradingApp:
                 sheet = wb.active
                 is_xlsx = True
             elif self.filepath.endswith('.xls'):
-                rb = open_workbook(self.filepath)
+                rb = xlrd.open_workbook(self.filepath)
                 wb = copy(rb)
                 sheet = rb.sheet_by_index(0)
                 write_sheet = wb.get_sheet(0)
@@ -335,7 +382,7 @@ class GradingApp:
 
                 standard_row = next(i for i in range(1, sheet.nrows)
                                     if sheet.cell(i, 1).value == student_name and
-                                    self.extract_attempt_number(sheet.cell(i, header['答题次数']).value) == max_attempts)
+                                       self.extract_attempt_number(sheet.cell(i, header['答题次数']).value) == max_attempts)
                 self.append_log(f"选择的标准答案行为: {standard_row + 1}，姓名：{student_name}\n")
 
                 standard_answers = [sheet.cell(standard_row, question_start_index + j).value for j in range(self.total_questions)]
