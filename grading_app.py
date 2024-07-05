@@ -12,6 +12,9 @@ from tkinter import filedialog
 import logging
 import openpyxl  # openpyxl库用于操作xlsx格式的Excel文件
 import xlrd  # xlrd库用于操作xls格式的Excel文件
+from tkinter import font, ttk, filedialog, messagebox
+import tkinter as tk  # 将tkinter模块导入并赋值给简写tk
+import shutil
 
 # 设置日志记录
 logging.basicConfig(level=logging.INFO, filename='grading_log.txt', filemode='w',
@@ -22,77 +25,96 @@ class GradingApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("专项题库自动改卷")
-        self.root.geometry('1000x600')  # 设置窗口大小
+        self.root.geometry('1000x700')  # 设置窗口大小
         self.filepath = None
 
+        # 设定Apple风格样式
+        style = ttk.Style(self.root)
+        style.theme_use('clam')
+
+        style.configure('TButton', font=('Helvetica', 12), foreground='white', background='#007AFF',
+                        borderwidth=0, bordercolor='#007AFF', focuscolor='none')
+        style.map('TButton',
+                  foreground=[('active', 'white'), ('disabled', '#a9a9a9')],
+                  background=[('active', '#005BBB'), ('disabled', '#d3d3d3')])
+
+        style.configure('TLabel', font=('Helvetica', 13), foreground='#333333', background='#F0F0F0')
+        style.configure('TEntry', font=('Helvetica', 12), foreground='#333333', fieldbackground='white', padding=5,
+                        borderwidth=1, relief='solid')
+
+        style.configure('TFrame', background='#F0F0F0')
+        style.configure('TProgressbar', thickness=8)
+
+        self.root.configure(bg='#F0F0F0')
+
         # 左侧布局（文件选择、题目数量、每题分值、开始改卷按钮、进度条及百分比、导出日志按钮）
-        left_frame = tk.Frame(self.root)
+        left_frame = ttk.Frame(self.root)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=20, pady=20)
 
-        self.file_button = tk.Button(left_frame, text="选择Excel文件", command=self.select_file)
+        self.file_button = ttk.Button(left_frame, text="选择Excel文件", command=self.select_file)
         self.file_button.pack(pady=5)
 
-        self.num_questions_label = tk.Label(left_frame, text="题目数量:")
+        self.num_questions_label = ttk.Label(left_frame, text="题目数量:")
         self.num_questions_label.pack(pady=5)
 
-        self.num_questions_entry = tk.Entry(left_frame)
+        self.num_questions_entry = ttk.Entry(left_frame)
         self.num_questions_entry.pack(pady=5)
         self.num_questions_entry.configure(state='disabled')  # 初始禁用
 
-        self.score_label = tk.Label(left_frame, text="每题分值:")
+        self.score_label = ttk.Label(left_frame, text="每题分值:")
         self.score_label.pack(pady=5)
 
-        self.score_entry = tk.Entry(left_frame)
+        self.score_entry = ttk.Entry(left_frame)
         self.score_entry.pack(pady=5)
         self.score_entry.configure(state='disabled')  # 初始禁用
 
-        self.start_button = tk.Button(left_frame, text="开始改卷", command=self.grade)
+        self.start_button = ttk.Button(left_frame, text="开始改卷", command=self.grade)
         self.start_button.pack(pady=5)
         self.start_button.configure(state='disabled')  # 初始禁用
 
-        self.progress_frame = tk.Frame(left_frame)
+        self.progress_frame = ttk.Frame(left_frame)
         self.progress_frame.pack(pady=20, fill=tk.X)
 
         self.progress_bar = ttk.Progressbar(self.progress_frame, orient="horizontal", length=200, mode='determinate')
         self.progress_bar.pack(pady=5)
 
-        self.progress_percent = tk.Label(self.progress_frame, text="进度: 0%")
+        self.progress_percent = ttk.Label(self.progress_frame, text="进度: 0%")
         self.progress_percent.pack(pady=5)
 
-        self.export_log_button = tk.Button(left_frame, text="导出日志", command=self.export_log)
+        self.export_log_button = ttk.Button(left_frame, text="导出日志", command=self.export_log)
         self.export_log_button.pack(pady=5)
 
         # 显示版本号的标签
-        self.version_label = tk.Label(left_frame, text="版本号: 1.0")
+        self.version_label = ttk.Label(left_frame, text="版本号: 1.02")
         self.version_label.pack(pady=5)
 
         # 检查更新按钮
-        self.update_button = tk.Button(left_frame, text="检测更新", command=self.check_update)
+        self.update_button = ttk.Button(left_frame, text="检测更新", command=self.check_update)
         self.update_button.pack(pady=5)
 
         # 显示更新日志的按钮
-        self.update_log_button = tk.Button(left_frame, text="更新日志", command=self.view_update_log)
+        self.update_log_button = ttk.Button(left_frame, text="更新日志", command=self.view_update_log)
         self.update_log_button.pack(pady=5)
 
         # 增加更新进度条
-        self.update_progress_frame = tk.Frame(left_frame)
+        self.update_progress_frame = ttk.Frame(left_frame)
         self.update_progress_frame.pack(pady=20, fill=tk.X)
 
         self.update_progress_bar = ttk.Progressbar(self.update_progress_frame, orient="horizontal", length=200, mode='determinate')
         self.update_progress_bar.pack(pady=5)
 
-        self.update_progress_percent = tk.Label(self.update_progress_frame, text="更新进度: 0%")
+        self.update_progress_percent = ttk.Label(self.update_progress_frame, text="更新进度: 0%")
         self.update_progress_percent.pack(pady=5)
 
         # 右侧布局（执行日志）
-        right_frame = tk.Frame(self.root)
+        right_frame = ttk.Frame(self.root)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # 增加滚动条
-        log_scrollbar = tk.Scrollbar(right_frame)
+        log_scrollbar = ttk.Scrollbar(right_frame)
         log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.log_text = tk.Text(right_frame, yscrollcommand=log_scrollbar.set)
+        self.log_text = tk.Text(right_frame, yscrollcommand=log_scrollbar.set, wrap='word', font=('Helvetica', 12), bg='white', fg='black', relief='flat', bd=0, padx=5, pady=5)
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
         log_scrollbar.config(command=self.log_text.yview)
@@ -122,14 +144,15 @@ class GradingApp:
             response = requests.get(url, stream=True)
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
-
+            
             downloaded = 0
             chunk_size = 8192
             retries = 3  # 最大重试次数
             
             for attempt in range(retries):
                 try:
-                    with open("grading_app_latest.exe", "wb") as f:
+                    temp_file_path = "grading_app_latest_temp.exe"
+                    with open(temp_file_path, "wb") as f:
                         for chunk in response.iter_content(chunk_size=chunk_size):
                             if chunk:  # filter out keep-alive new chunks
                                 f.write(chunk)
@@ -138,18 +161,19 @@ class GradingApp:
                                 self.update_progress_bar['value'] = progress
                                 self.update_progress_percent.config(text=f"更新进度: {int(progress)}%")
                                 self.root.update_idletasks()
-
+                    
                     # Ensure the stream is closed before validation
                     response.close()
 
                     # Verify the download completion and file size
-                    local_file_size = os.path.getsize("grading_app_latest.exe")
+                    local_file_size = os.path.getsize(temp_file_path)
                     if local_file_size == total_size:
+                        shutil.move(temp_file_path, "grading_app_latest.exe")
                         messagebox.showinfo("更新成功", "程序已更新，请重新启动")
                         break  # 退出重试循环
                     else:
                         raise Exception("下载文件大小不匹配")
-
+                    
                 except Exception as e:
                     if attempt == retries - 1:
                         raise e  # 重试三次后再引发异常
