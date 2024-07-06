@@ -1,3 +1,7 @@
+v1.03
+- 修复了一些BUG
+- 隐藏进度条
+
 v1.02
 UI优化
 - 将 tk 的 Label 和 Button 等小部件换成 ttk 小部件
