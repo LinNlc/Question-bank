@@ -15,9 +15,17 @@ import xlrd  # xlrd库用于操作xls格式的Excel文件
 from tkinter import font, ttk, filedialog, messagebox
 import tkinter as tk  # 将tkinter模块导入并赋值给简写tk
 import shutil
+import tempfile
+
+
+# 将日志文件保存到临时目录中
+log_file_path = os.path.join(tempfile.gettempdir(), 'grading_log.txt')
+
+# 确保日志文件的目录存在
+os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 
 # 设置日志记录
-logging.basicConfig(level=logging.INFO, filename='grading_log.txt', filemode='w',
+logging.basicConfig(level=logging.INFO, filename=log_file_path, filemode='w',
                     format='%(asctime)s - %(message)s')
 
 
@@ -85,7 +93,7 @@ class GradingApp:
         self.export_log_button.pack(pady=5)
 
         # 显示版本号的标签
-        self.version_label = ttk.Label(left_frame, text="版本号: 1.02")
+        self.version_label = ttk.Label(left_frame, text="版本号:v1.02")
         self.version_label.pack(pady=5)
 
         # 检查更新按钮
@@ -128,7 +136,7 @@ class GradingApp:
             response.raise_for_status()
             latest_version = response.text.strip()
 
-            if latest_version > "1.0":
+            if latest_version > "v1.02":
                 if messagebox.askyesno("更新提醒", f"发现新版本 {latest_version}，是否更新？"):
                     self.update_program(latest_version)
             else:
