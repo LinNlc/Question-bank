@@ -33,27 +33,42 @@ class GradingApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("专项题库自动改卷")
-        self.root.geometry('1000x700')  # 设置窗口大小
+        self.root.geometry('1000x600')  # 设置窗口大小
         self.filepath = None
+
+        # 增加“帮助”菜单
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)  # 设置菜单栏
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="帮助", menu=help_menu)
+
+        help_menu.add_command(label="使用说明", command=self.show_instructions)
+        help_menu.add_command(label="关于软件", command=self.show_about)
+
 
         # 设定Apple风格样式
         style = ttk.Style(self.root)
         style.theme_use('clam')
 
-        style.configure('TButton', font=('Helvetica', 12), foreground='white', background='#007AFF',
-                        borderwidth=0, bordercolor='#007AFF', focuscolor='none')
-        style.map('TButton',
-                  foreground=[('active', 'white'), ('disabled', '#a9a9a9')],
-                  background=[('active', '#005BBB'), ('disabled', '#d3d3d3')])
+        neutral_bg = "#ffffff"
+        accent_color = "#2F3136"
+        text_color = "#2b2b2b"
+        button_color = "#4a4a4a"
+        progress_color = "#4a4a4a"
 
-        style.configure('TLabel', font=('Helvetica', 13), foreground='#333333', background='#F0F0F0')
-        style.configure('TEntry', font=('Helvetica', 12), foreground='#333333', fieldbackground='white', padding=5,
+        style.configure('TButton', font=('Helvetica', 12), foreground=neutral_bg, background=button_color,
+                    borderwidth=0, bordercolor=button_color)
+        style.map('TButton', foreground=[('active', neutral_bg), ('disabled', '#a9a9a9')],
+              background=[('active', accent_color), ('disabled', '#d3d3d3')])
+
+        style.configure('TLabel', font=('Helvetica', 13), foreground=text_color, background=neutral_bg)
+        style.configure('TEntry', font=('Helvetica', 12), foreground=text_color, fieldbackground=neutral_bg, padding=5,
                         borderwidth=1, relief='solid')
+        style.configure('TFrame', background=neutral_bg)
+        style.configure('TProgressbar', thickness=8, troughcolor=neutral_bg, background=progress_color)
 
-        style.configure('TFrame', background='#F0F0F0')
-        style.configure('TProgressbar', thickness=8)
-
-        self.root.configure(bg='#F0F0F0')
+        self.root.configure(bg=neutral_bg)
 
         # 左侧布局（文件选择、题目数量、每题分值、开始改卷按钮、进度条及百分比、导出日志按钮）
         left_frame = ttk.Frame(self.root)
@@ -82,6 +97,7 @@ class GradingApp:
 
         self.progress_frame = ttk.Frame(left_frame)
         self.progress_frame.pack(pady=20, fill=tk.X)
+        self.progress_frame.pack_forget()  # 初始隐藏进度条
 
         self.progress_bar = ttk.Progressbar(self.progress_frame, orient="horizontal", length=200, mode='determinate')
         self.progress_bar.pack(pady=5)
@@ -91,10 +107,6 @@ class GradingApp:
 
         self.export_log_button = ttk.Button(left_frame, text="导出日志", command=self.export_log)
         self.export_log_button.pack(pady=5)
-
-        # 显示版本号的标签
-        self.version_label = ttk.Label(left_frame, text="版本号:v1.02")
-        self.version_label.pack(pady=5)
 
         # 检查更新按钮
         self.update_button = ttk.Button(left_frame, text="检测更新", command=self.check_update)
@@ -107,12 +119,16 @@ class GradingApp:
         # 增加更新进度条
         self.update_progress_frame = ttk.Frame(left_frame)
         self.update_progress_frame.pack(pady=20, fill=tk.X)
-
         self.update_progress_bar = ttk.Progressbar(self.update_progress_frame, orient="horizontal", length=200, mode='determinate')
-        self.update_progress_bar.pack(pady=5)
-
         self.update_progress_percent = ttk.Label(self.update_progress_frame, text="更新进度: 0%")
+        self.update_progress_frame.pack_forget()  # 初始隐藏更新进度条
+
+        self.update_progress_bar.pack(pady=5)
         self.update_progress_percent.pack(pady=5)
+
+        # 显示版本号的标签
+        self.version_label = ttk.Label(left_frame, text="版本号:v1.03")
+        self.version_label.pack(pady=5)
 
         # 右侧布局（执行日志）
         right_frame = ttk.Frame(self.root)
@@ -130,13 +146,27 @@ class GradingApp:
         self.num_questions_entry.bind("<KeyRelease>", self.check_inputs)
         self.score_entry.bind("<KeyRelease>", self.check_inputs)
 
+    def show_instructions(self):
+        instructions = """
+        1. 点击“选择Excel文件”按钮选择题库文件。
+        2. 输入题目数量和每题分值。
+        3. 确保导出数据有满分的成绩。
+        4. 点击“开始改卷”按钮进行自动评分。
+        """
+        messagebox.showinfo("使用说明", instructions)
+
+    def show_about(self):
+        about_info = "专项题库自动改卷 v1.03\n开发者: Lin Nlc\n更多信息请访问GitHub项目页面：https://github.com/LinNlc/Question-bank.git。"
+        messagebox.showinfo("关于软件", about_info)
+        
+
     def check_update(self):
         try:
             response = requests.get("https://raw.githubusercontent.com/LinNlc/Question-bank/main/latest_version.txt")
             response.raise_for_status()
             latest_version = response.text.strip()
 
-            if latest_version > "v1.02":
+            if latest_version > "v1.03":
                 if messagebox.askyesno("更新提醒", f"发现新版本 {latest_version}，是否更新？"):
                     self.update_program(latest_version)
             else:
@@ -145,6 +175,9 @@ class GradingApp:
             messagebox.showerror("更新错误", f"无法检查更新: {str(e)}")
 
     def update_program(self, latest_version):
+        self.update_progress_frame.pack(pady=20, fill=tk.X)  # 检测到更新时显示进度条
+        self.root.update_idletasks()  # 确保进度条显示
+        
         try:
             # Remove non-semantic characters from version and ensure it's in semantic version format
             version_no = re.sub(r'[^0-9.]', '', latest_version)
@@ -256,6 +289,9 @@ class GradingApp:
         return int(match.group()) if match else None
 
     def grade(self):
+        self.progress_frame.pack(pady=20, fill=tk.X)  # 开始改卷时显示进度条
+        self.root.update_idletasks()  # 确保进度条显示
+        
         if not self.filepath:
             messagebox.showerror("文件错误", "请选择一个Excel文件")
             return
