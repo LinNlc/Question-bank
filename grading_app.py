@@ -517,4 +517,3 @@ class GradingApp:
 if __name__ == "__main__":
     app = GradingApp()
     app.run()
-
